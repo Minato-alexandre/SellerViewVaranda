@@ -1,71 +1,79 @@
 # 📝 DOCUMENTAÇÃO DA ARQUITETURA (Clean Architecture / MVVM)
 
-Este documento descreve a função de cada projeto e os principais arquivos dentro da Solução `RealTimeApp.sln`, que utiliza Avalonia UI para o cliente mobile e ASP.NET Core para o backend (PostgreSQL/SignalR).
+**Solução:** `RealTimeApp.sln`
+
+**Objetivo Estratégico do MVP:** Entregar um aplicativo móvel (Avalonia para iOS/Android) focado em Tomada de Decisão (Venda/Margem em tempo real) e Automação de Processos Críticos (Captura Móvel e Classificação Mercadológica via IA).
 
 ---
 
 ## 1. 🌐 RealTimeApp.Domain (O Cérebro do Negócio)
 
 * **Tipo de Projeto:** Biblioteca de Classes (.NET Padrão)
-* **Responsabilidade:** Define o *O QUÊ* do sistema (Entidades, Regras de Negócio e Contratos). Não possui dependências externas.
+* **Responsabilidade:** Definir as regras e as estruturas de dados do negócio.
 
 | Caminho do Arquivo | Descrição |
 | :--- | :--- |
-| `Pedido.cs` | **Entidade Principal:** Define a estrutura de um Pedido (Id, Descrição, Status, DataAtualizacao). É o objeto que será persistido no DB. |
-| `PedidoStatus.cs` | **Enums/Value Objects:** Tipos específicos de valor usados no Domínio (Ex: status do pedido). |
-| `Interfaces/IPedidoRepository.cs` | **Contrato de Repositório:** Define os métodos necessários para interagir com a persistência de Pedidos. |
+| `Pedido.cs` | Entidade para rastreio de pedidos e O.S. |
+| `CategoriaMercadologica.cs` | **NOVO:** Entidade de auto-referência para modelar a hierarquia de 4 níveis (conforme exemplo). |
+| `Produto.cs` | Entidade central que será alimentada pela automação (incluir campos para Imagem e Cód. de Barras). |
+| `Interfaces/IPedidoRepository.cs` | Contrato de acesso a dados para Pedidos. |
 
 ---
 
 ## 2. 📱 RealTimeApp.Application (A Lógica de Cliente e Apresentação)
 
 * **Tipo de Projeto:** Biblioteca de Classes (.NET Padrão)
-* **Responsabilidade:** Contém a lógica de apresentação e orquestração dos dados para a UI (os ViewModels). Lógica de negócios compartilhada entre cliente e servidor.
+* **Responsabilidade:** Contém a lógica de apresentação (ViewModels) e orquestração de dados.
 
 | Caminho do Arquivo | Descrição |
 | :--- | :--- |
-| `ViewModels/ViewModelBase.cs` | **Base do MVVM:** Implementa a interface `INotifyPropertyChanged` para atualização automática da UI. |
-| `ViewModels/MainViewModel.cs` | **Controle da Tela Principal:** Lida com a busca inicial de dados e se inscreve para atualizações em tempo real. |
-| `DTOs/PedidoDto.cs` | **Modelo de Transferência:** Estrutura de dados usada para comunicação através da rede. |
+| `ViewModels/MainViewModel.cs` | Dashboard Executivo: **Binding** para Venda Líquida e Margem em tempo real. |
+| `ViewModels/NewProductViewModel.cs` | **NOVO:** Lógica para controle da câmera, envio de imagem/código de barras e exibição da sugestão de categoria da IA. |
+| `DTOs/FinanceiroDto.cs` | Modelo de transferência para métricas (Venda Líquida, Margem). |
+| `DTOs/CategoriaSugestaoDto.cs` | Modelo de transferência para a resposta da IA. |
 
 ---
 
 ## 3. 💾 RealTimeApp.Infrastructure (O Acesso aos Recursos)
 
 * **Tipo de Projeto:** Biblioteca de Classes (.NET Padrão)
-* **Responsabilidade:** Contém as implementações concretas (o *COMO*) de acesso a dados (PostgreSQL/EF Core/Npgsql) e recursos externos.
+* **Responsabilidade:** Contém as implementações concretas de DB (PostgreSQL) e integração com IA/Serviços.
 
 | Caminho do Arquivo | Descrição |
 | :--- | :--- |
-| `Data/ApplicationDbContext.cs` | **Contexto EF Core:** Mapeia Entidades para o PostgreSQL, gerencia a Connection String e as Migrations. |
-| `Data/Repositories/PostgreSqlPedidoRepository.cs` | **Implementação de Contrato:** Implementa a `IPedidoRepository` usando o EF Core/Npgsql. |
-| `RealTime/PostgreSqlChangeListener.cs` | **Serviço de Background:** Usa a conexão Npgsql para executar `LISTEN/NOTIFY` do DB, integrando-se ao SignalR. |
+| `Data/ApplicationDbContext.cs` | Mapeamento EF Core para Pedidos, Produtos e **CategoriaMercadologica**. |
+| `RealTime/PostgreSqlChangeListener.cs` | Serviço `LISTEN/NOTIFY` para detectar alterações e enviar **Margem/Venda** pelo SignalR. |
+| `Services/MlIntegrationService.cs` | **NOVO:** Lógica de comunicação com o modelo de Machine Learning para a classificação mercadológica. |
+| `Data/Repositories/...` | Implementações dos contratos de repositório. |
 
 ---
 
 ## 4. ⚙️ RealTimeApp.Server (O Backend - ASP.NET Core API)
 
 * **Tipo de Projeto:** ASP.NET Core Web API (Executável)
-* **Responsabilidade:** Hospeda a API REST, o SignalR Hub e configura a infraestrutura (DI, DB).
+* **Responsabilidade:** Ponto de entrada da rede, hospedagem de APIs, SignalR e lógica de IA/Infraestrutura.
 
-| Caminho do Arquivo | Descrição |
-| :--- | :--- |
-| `Program.cs` | **Bootstrapper:** Ponto de entrada da API. Configura DI, EF Core e SignalR. |
-| `appsettings.json` | **Configuração:** Armazena parâmetros externos, como a **ConnectionString do PostgreSQL**. |
-| `Controllers/PedidosController.cs` | **API REST:** Lida com as requisições HTTP (GET, POST) do cliente. |
-| `Hubs/PedidosHub.cs` | **SignalR Hub:** O ponto de conexão persistente para enviar atualizações em tempo real para o Avalonia. |
+### Operações Essenciais do Backend (Ampliado)
+
+| Componente | Operação | Responsabilidade |
+| :--- | :--- | :--- |
+| `FinanceiroHub.cs` (SignalR) | `SendMetrics` | Distribui **Venda Líquida e Margem** em tempo real para o Dashboard do CEO. |
+| `ProdutosController.cs` (REST) | `POST /api/produtos/captura` | Recebe a imagem e o código de barras do Avalonia e inicia o processo de IA. |
+| `AiController.cs` (REST) | `GET /api/ai/sugestao` | Endpoint para o **`MlIntegrationService`** retornar a sugestão de categoria de 4 níveis. |
+| `PostgreSqlChangeListener.cs` | `LISTEN/NOTIFY` | Monitora o DB por novas vendas (para o cálculo da Margem) e por novos produtos. |
 
 ---
 
 ## 5. 🎨 RealTimeApp.Mobile (O Frontend - Avalonia UI)
 
 * **Tipo de Projeto:** Avalonia Cross-Platform Application (Executável)
-* **Responsabilidade:** Exibe a Interface do Usuário (UI) no Android, iOS e Desktop.
+* **Responsabilidade:** Exibir a UI no Android, iOS e lidar com a experiência de captura móvel.
 
 | Caminho do Arquivo | Descrição |
 | :--- | :--- |
-| `App.axaml.cs` | **Inicialização da UI:** Configura o tema e o registro de ViewModels (DI) para as Views. |
-| `Views/MainView.axaml` | **O Design da Tela:** Arquivo XAML que define os controles visuais e o *Binding* com o `MainViewModel`. |
-| `Services/HttpDataService.cs` | **Cliente HTTP:** Classe que usa `HttpClient` para fazer as chamadas REST iniciais para o `RealTimeApp.Server`. |
-| `Services/RealTimeService.cs` | **Cliente SignalR:** Classe que mantém a conexão com o `PedidosHub` para receber os dados em tempo real. |
+| `Views/MainView.axaml` | Dashboard Executivo: Exibição da Venda Líquida e Margem (Binding com `MainViewModel`). |
+| `Views/NewProductView.axaml` | **NOVO:** View para controle da câmera, visualização do código de barras escaneado e apresentação da sugestão de categoria da IA para validação do usuário. |
+| `Services/CameraService.cs` | **NOVO:** Utiliza `Avalonia.Essentials` para acesso nativo à câmera e escaneamento de código de barras. |
+| `Services/RealTimeService.cs` | Conexão com o **`FinanceiroHub`** para as métricas executivas. |
 
+---
