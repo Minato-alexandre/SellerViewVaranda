@@ -8,15 +8,14 @@
 
 ## 1. 🌐 RealTimeApp.Domain (O Cérebro do Negócio)
 
-* **Tipo de Projeto:** Biblioteca de Classes (.NET Padrão)
 * **Responsabilidade:** Definir as regras e as estruturas de dados do negócio.
 
 | Caminho do Arquivo | Descrição |
 | :--- | :--- |
-| `Pedido.cs` | Entidade para rastreio de pedidos e O.S. |
-| `CategoriaMercadologica.cs` | **NOVO:** Entidade de auto-referência para modelar a hierarquia de 4 níveis (conforme exemplo). |
-| `Produto.cs` | Entidade central que será alimentada pela automação (incluir campos para Imagem e Cód. de Barras). |
-| `Interfaces/IPedidoRepository.cs` | Contrato de acesso a dados para Pedidos. |
+| `AlertaEstoque.cs` | **NOVA Entidade de Rastreamento:** Para registrar e monitorar ações necessárias (Ex: Ação de liquidação para Produtos Vencendo) |
+| `CategoriaMercadologica.cs` | Estrutura de hierarquia de 4 níveis para a classificação de produtos. |
+| `Produto.cs` | Entidade central para o cadastro, incluindo Imagem e Cód. de Barras. |
+| `Interfaces/IAlertaRepository.cs` | Contrato de acesso a dados para os Alertas de Estoque Crítico. |
 
 ---
 
@@ -50,17 +49,16 @@
 
 ## 4. ⚙️ RealTimeApp.Server (O Backend - ASP.NET Core API)
 
-* **Tipo de Projeto:** ASP.NET Core Web API (Executável)
-* **Responsabilidade:** Ponto de entrada da rede, hospedagem de APIs, SignalR e lógica de IA/Infraestrutura.
+* **Responsabilidade:** Hospedagem de APIs, SignalR e lógica de IA/Infraestrutura.
 
-### Operações Essenciais do Backend (Ampliado)
+### Operações Essenciais do Backend (Foco Varejo/Finanças)
 
 | Componente | Operação | Responsabilidade |
 | :--- | :--- | :--- |
-| `FinanceiroHub.cs` (SignalR) | `SendMetrics` | Distribui **Venda Líquida e Margem** em tempo real para o Dashboard do CEO. |
-| `ProdutosController.cs` (REST) | `POST /api/produtos/captura` | Recebe a imagem e o código de barras do Avalonia e inicia o processo de IA. |
-| `AiController.cs` (REST) | `GET /api/ai/sugestao` | Endpoint para o **`MlIntegrationService`** retornar a sugestão de categoria de 4 níveis. |
-| `PostgreSqlChangeListener.cs` | `LISTEN/NOTIFY` | Monitora o DB por novas vendas (para o cálculo da Margem) e por novos produtos. |
+| `FinanceiroHub.cs` (SignalR) | `SendMetrics` | Distribui **Venda Líquida e Margem** em tempo real para o Dashboard Executivo. |
+| `ProdutosController.cs` (REST) | `POST /api/produtos/captura` | Recebe a imagem e o código de barras do Avalonia para iniciar a automação. |
+| `AiController.cs` (REST) | `GET /api/ai/sugestao` | Endpoint para a IA retornar a sugestão da Categoria Mercadológica de 4 níveis. |
+| `PostgreSqlChangeListener.cs` | `LISTEN/NOTIFY` | Monitora o DB por **novas vendas** (para Margem/Venda Líquida) e por **produtos próximos ao vencimento**. |
 
 ---
 
